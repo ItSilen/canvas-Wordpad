@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport"
+		  content="width=device-width,
+		  			height=device-height,
+		  			initial-scale=1.0,
+		  			minimum-scale=1.0,
+		  			maximum-scale=1.0,
+		  			user-scalable=no"/>
+	<title>Document</title>
+	<script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+	<style>
+		#canvas{
+			display: block;
+			margin: 0 auto;
+			/*border: 1px solid red;*/
+
+		}
+
+		#canvas-wrapper, #controller{
+			margin: 0 auto;
+		}
+
+		.op_btn{
+			float: right;
+			margin: 10px 0 0 10px;
+			border: 2px solid #aaa;
+			width: 80px;
+			height: 40px;
+			line-height: 40px;
+			font-size: 20px;
+			text-align: center;
+			border-radius: 5px 5px;
+			cursor: pointer;
+			background-color: white;
+			font-weight: bold;
+			font-family: Microsoft Yahei, Arial;
+		}
+
+		.op_btn:hover{
+			background-color: #def;
+		}
+
+		.clearfix {
+			clear: both;
+		}
+
+		.color_btn{
+		    float: left;
+		    margin: 10px 10px 0 0;
+		    border:5px solid white;
+		    width:40px;
+		    height:40px;
+		    border-radius: 5px 5px;
+		    cursor:pointer;
+		}
+		.color_btn:hover{
+		    border: 5px solid violet;
+		}
+		.color_btn_selected{
+		    border: 5px solid blueviolet;
+		}
+		#black_btn{
+		    background-color: black;
+		}
+		#blue_btn{
+		    background-color: blue;
+		}
+		#green_btn{
+		    background-color: green;
+		}
+		#red_btn{
+		    background-color: red;
+		}
+		#orange_btn{
+		    background-color: orange;
+		}
+		#yellow_btn{
+		    background-color: yellow;
+		}
+	</style>
+</head>
+<body>
+	<div id="canvas-wrapper">
+		<canvas id="canvas" >
+			您的浏览器不支持canvas
+		</canvas>
+	</div>
+	<div id="controller">
+		<div id="black_btn" class="color_btn color_btn_selected"></div>
+		<div id="blue_btn" class="color_btn"></div>
+		<div id="green_btn" class="color_btn"></div>
+		<div id="red_btn" class="color_btn"></div>
+		<div id="orange_btn" class="color_btn"></div>
+		<div id="yellow_btn" class="color_btn"></div>
+		<div class="clearfix"></div>
+		<div style="height: 60px;width: 100%;" >
+			<input type="range" min="1" max="30" value="2" id="maxLineWidth_input" style="width: 60%;vertical-align: middle;">
+			<span id="maxLineWidth_text" style="display:inline-block;text-align:right;width: 30%;height: 60px;line-height: 60px;"></span>
+		</div>
+
+		<div id="clear_btn" class="op_btn">清 除</div>
+		<div id="add_btn" class="op_btn">增 加</div>
+	</div>
+
+
+	<script>
+
+
+		var canvasWidth = Math.min(600, $(window).width() - 20);
+		var canvasHeight = canvasWidth + 200;
+
+		var isMouseDown = false;
+		var lastLoc = {x: 0, y: 0};
+
+		var lastTimeStamp = 0;
+		var lastLineWidth = -1;
+
+		var canvasMoreId = 0;
+		
+		var maxLineWidth = $("#maxLineWidth_input").val();
+
+		$("#canvas-wrapper").width(canvasWidth);
+
+		$("#maxLineWidth_text").text("线条宽：" + maxLineWidth + "px");
+		 $("#maxLineWidth_input").mousemove(function() {
+		 	maxLineWidth = $(this).val();
+		 	$("#maxLineWidth_text").text("线条宽：" + $(this).val() + "px")
+
+		 });
+
+		 var maxLineWidth_input =  document.getElementById("maxLineWidth_input")
+
+		$("#maxLineWidth_input").on("touchmove touchend", function(e) {
+			maxLineWidth = $(this).val();
+		 	$("#maxLineWidth_text").text("线条宽：" + maxLineWidth + "px")
+		})
+
+		var minLineWidth = 1;
+		var maxStrokeV = 1.5;
+		var minStrokeV = 0.1;
+
+		var strokeColor = "black";
+
+		canvas = document.getElementById("canvas");
+		context = canvas.getContext("2d");
+
+		canvas.width = canvasWidth;
+		canvas.height = canvasHeight;
+
+		$("#controller").css("width", canvasWidth + "px")
+		drawGrid(context) 
+
+		
+		// 添加画布
+		$("#add_btn").click(function() {
+			canvasMoreId++;
+			var canvas_more = $("<canvas>您的浏览器不支持canvas</canvas>");
+			$("#canvas-wrapper").append(canvas_more);
+			var id = "canvas-" + canvasMoreId;
+			canvas_more.attr("id", id);
+			var canvas_more_dom = document.getElementById(id);
+			canvas_more_dom.width = canvasWidth;
+			canvas_more_dom.height = canvasHeight;
+			var ctx = canvas_more_dom.getContext("2d");
+			drawGrid(ctx) 
+			drawEvent(canvas_more_dom, ctx)
+		})
+
+		$(".color_btn").click(function() {
+			$(".color_btn").removeClass("color_btn_selected");
+			$(this).addClass("color_btn_selected");
+			strokeColor = $(this).css("background-color");
+		})
+
+		function beginStroke(point,cvs, ctx) {
+			isMouseDown = true;
+			lastLoc = windowToCanvas(point.x, point.y, cvs);
+			
+			lastTimeStamp = new Date().getTime();
+
+			
+			ctx.lineWidth = maxLineWidth / 5;
+			ctx.beginPath();
+			ctx.arc(lastLoc.x, lastLoc.y, ctx.lineWidth / 2, 0, 2 * Math.PI)
+			ctx.fillStyle = strokeColor;
+			ctx.fill();
+
+		}
+
+		function endStroke() {
+
+			isMouseDown = false;
+			lastLineWidth = -1
+		}
+		
+		// 移动时绘制线条
+		function moveStroke(point, cvs, ctx) {
+			var curLoc = windowToCanvas(point.x, point.y, cvs);
+			var curTimeStamp = new Date().getTime();
+
+			var s = calcDistance(lastLoc, curLoc);
+			var t = curTimeStamp - lastTimeStamp;
+
+			var lineWidth = calcLineWidth(t, s);
+
+			ctx.save()
+			ctx.beginPath();
+
+			ctx.moveTo(lastLoc.x, lastLoc.y);
+			ctx.lineTo(curLoc.x, curLoc.y);
+
+			ctx.strokeStyle = strokeColor;
+			ctx.lineWidth = lineWidth;
+			ctx.lineCap = "round";
+			ctx.lineJoin = "round";
+			ctx.stroke();
+
+			ctx.restore()
+
+			lastLoc = curLoc;
+			lastTimeStamp = curTimeStamp;
+			lastLineWidth = lineWidth;
+		}
+
+		drawEvent(canvas, context);
+
+		// 各种交互的实现
+		function drawEvent(cvs, ctx) {
+			// 清除按钮
+			$("#clear_btn").click(function() {
+				ctx.clearRect(0, 0, cvs.width, cvs.height);
+				drawGrid(ctx) 
+			})
+
+			cvs.onmousedown = function(e) {
+				e.preventDefault();
+				beginStroke({x: e.clientX, y: e.clientY}, cvs, ctx)
+			}
+
+			cvs.onmouseup = function(e) {
+				e.preventDefault();
+				endStroke()
+			}
+
+			cvs.onmouseout = function(e) {
+				e.preventDefault();
+				endStroke()
+			}
+
+			cvs.onmousemove = function(e) {
+				e.preventDefault();
+				if (isMouseDown) {
+					moveStroke({x: e.clientX, y: e.clientY}, cvs, ctx)
+				}
+			}
+
+			cvs.addEventListener("touchstart", function(e) {
+				e.preventDefault();
+				touch = e.touches[0]
+				beginStroke({x: touch.pageX - $(window).scrollLeft(), y: touch.pageY - $(window).scrollTop()},cvs, ctx)
+			})
+
+			cvs.addEventListener("touchmove", function(e) {
+				e.preventDefault();
+				if (isMouseDown) {
+					touch = e.touches[0]
+					moveStroke({x: touch.pageX - $(window).scrollLeft(), y: touch.pageY - $(window).scrollTop()}, cvs,ctx)
+				}
+			})
+
+			cvs.addEventListener("touchend", function(e) {
+				e.preventDefault();
+				endStroke();
+			})
+		}
+		
+		// 计算线条移动时的宽度
+		function calcLineWidth(t, s) {
+			var v = s / t;
+			var resultLineWidth;
+			if (v <= 0.1) {
+				resultLineWidth = maxLineWidth;
+			} else if(v >= maxStrokeV) {
+				resultLineWidth = minLineWidth;
+			} else {
+				resultLineWidth = maxLineWidth - (v - minStrokeV) / (maxStrokeV - minStrokeV) * (maxLineWidth - minLineWidth);
+			}
+			
+			// -1就是说这是我们第一次计算的线条宽度，
+			if (lastLineWidth == -1) {
+				return resultLineWidth;
+			}
+
+			return lastLineWidth * 80 / 100 + resultLineWidth * 20 / 100;
+		}
+
+		function calcDistance(loc1, loc2) {
+			return Math.sqrt((loc1.x - loc2.x) * (loc1.x - loc2.x) + (loc1.y - loc2.y) * (loc1.y - loc2.y));
+		}
+
+		function windowToCanvas(x, y, cvs) {
+			var bbox = cvs.getBoundingClientRect();
+			return {x: Math.round(x - bbox.left), y: Math.round(y - bbox.top)};
+		}
+
+		// 绘制画布背景
+		function drawGrid(ctx) {
+			ctx.save();
+
+
+			ctx.strokeStyle = "red";   
+
+			ctx.beginPath();
+			ctx.moveTo(3, 3);
+			ctx.lineTo(canvasWidth - 3, 3);
+			ctx.lineTo(canvasWidth - 3, canvasHeight - 3);
+			ctx.lineTo(3, canvasHeight - 3);
+			ctx.closePath();
+
+			ctx.lineWidth = 6;
+			ctx.stroke();
+			
+			ctx.beginPath();
+			ctx.moveTo(0, 0);
+			ctx.lineTo(canvasWidth, canvasHeight);
+
+			ctx.moveTo(canvasWidth, 0);
+			ctx.lineTo(0, canvasHeight);
+
+			ctx.moveTo(canvasWidth / 2, 0);
+			ctx.lineTo(canvasWidth / 2, canvasHeight);
+
+			ctx.moveTo(0, canvasHeight / 2);
+			ctx.lineTo(canvasWidth, canvasHeight / 2);
+
+			ctx.lineWidth = 1;
+			ctx.stroke();
+
+			ctx.restore();
+
+		}
+
+		
+	</script>
+</body>
+</html>
